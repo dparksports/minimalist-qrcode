@@ -17,6 +17,7 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         
         let output = AVCaptureVideoDataOutput()
         output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         
         session.addInput(input)
         session.addOutput(output)
@@ -44,6 +45,55 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             }
         }
         try? VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])
+        
+        // --- ASCII Preview ---
+        // Downscale and render ASCII art for live preview
+        let width = 64
+        let height = 32
+        if let ascii = self.asciiArt(from: pixelBuffer, width: width, height: height) {
+            // Move cursor to top-left (ANSI) and print
+            print("\u{001B}[H" + ascii)
+        }
+    }
+    
+    // Convert PixelBuffer to ASCII Art
+    func asciiArt(from pixelBuffer: CVPixelBuffer, width: Int, height: Int) -> String? {
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let totalWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let totalHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let buffer = baseAddress.assumingMemoryBound(to: UInt8.self)
+        
+        var art = ""
+        let chars = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "] // Dark to Light map
+        
+        // Sampling steps
+        let stepX = totalWidth / width
+        let stepY = totalHeight / height
+        
+        for y in 0..<height {
+            for x in 0..<width {
+                // Simple nearest-neighbor sampling
+                let pixelX = x * stepX
+                let pixelY = y * stepY
+                let offset = pixelY * bytesPerRow + pixelX * 4 // Assuming BGRA (4 bytes)
+                
+                // Calculate brightness (average of RGB)
+                let b = buffer[offset]
+                let g = buffer[offset + 1]
+                let r = buffer[offset + 2]
+                let brightness = Int(Double(r) + Double(g) + Double(b)) / 3
+                
+                // Map brightness to character index
+                let index = (brightness * (chars.count - 1)) / 255
+                art.append(chars[index])
+            }
+            art.append("\n")
+        }
+        return art
     }
     
     func parseAndLog(_ payload: String) {
