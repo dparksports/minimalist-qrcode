@@ -10,10 +10,10 @@ Run the following command to download and run the tool on any Mac (Intel or Appl
 
 ```bash
 # Download
-curl -L -o wifi_scanner https://github.com/dparksports/minimalist-qrcode/releases/download/v1.2.0/wifi_scanner
+curl -L -o wifi_scanner https://github.com/dparksports/minimalist-qrcode/releases/download/v1.2.1/wifi_scanner
 
 # Verify Checksum (Recommended)
-echo "0d97a80de5253122ad14f0663bb72d69b833029d26eeebacab27c93060f282e7  wifi_scanner" | shasum -a 256 -c -
+echo "91ee2f7ae87106a3cd2ebc71161beb2c78a95bdfe75b9e1e8ca9997f25951f74  wifi_scanner" | shasum -a 256 -c -
 
 # Make executable
 chmod +x wifi_scanner
