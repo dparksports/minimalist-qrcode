@@ -6,6 +6,7 @@ print("1. Program launched...")
 
 class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
+    var frameCount = 0
     
     func start() {
         print("4. Configuring Camera...")
@@ -40,11 +41,25 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             guard let results = request.results as? [VNBarcodeObservation] else { return }
             for result in results {
                 if let payload = result.payloadStringValue, payload.hasPrefix("WIFI:") {
+                    // Play success sound
+                    NSSound(named: "Hero")?.play()
                     self.parseAndLog(payload)
                 }
             }
         }
+        // 1. Scan for QR Code (Prioritize this!)
         try? VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])
+        
+        // 2. Render ASCII Preview (Throttle: Every 30 frames ~= 1 second)
+        frameCount += 1
+        if frameCount % 30 == 0 {
+            let width = 64
+            let height = 32
+            if let ascii = self.asciiArt(from: pixelBuffer, width: width, height: height) {
+                // Move cursor to top-left (ANSI) and print
+                print("\u{001B}[H" + ascii)
+            }
+        }
     }
     
     // Convert PixelBuffer to ASCII Art (Optimized for YUV)
@@ -100,10 +115,13 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     func parseAndLog(_ payload: String) {
         // Expected Format: WIFI:S:SSID;T:WPA;P:PASSWORD;;
+        // Strip "WIFI:" prefix if present so we can parse S: cleanly
+        let cleanPayload = payload.hasPrefix("WIFI:") ? String(payload.dropFirst(5)) : payload
+        
         var ssid: String?
         var password: String?
         
-        let components = payload.split(separator: ";")
+        let components = cleanPayload.split(separator: ";")
         for component in components {
             let trimmed = component.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("S:") {
