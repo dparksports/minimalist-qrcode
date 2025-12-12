@@ -17,7 +17,7 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         
         let output = AVCaptureVideoDataOutput()
         output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
-        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        // Removed forced BGRA setting to allow default YUV (better for Vision)
         
         session.addInput(input)
         session.addOutput(output)
@@ -56,39 +56,50 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         }
     }
     
-    // Convert PixelBuffer to ASCII Art
+    // Convert PixelBuffer to ASCII Art (Optimized for YUV)
     func asciiArt(from pixelBuffer: CVPixelBuffer, width: Int, height: Int) -> String? {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
         
-        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
-        let totalWidth = CVPixelBufferGetWidth(pixelBuffer)
-        let totalHeight = CVPixelBufferGetHeight(pixelBuffer)
-        let buffer = baseAddress.assumingMemoryBound(to: UInt8.self)
+        // YUV usually has 2 planes: Y (Luminance) and UV (Chrominance). We only need Y.
+        // If it's not planar (e.g. BGRA from before), this might fail if we don't check.
+        // But since we removed the setting, it defaults to YUV.
+        
+        var baseAddress: UnsafeMutableRawPointer?
+        var bytesPerRow: Int
+        var totalWidth: Int
+        var totalHeight: Int
+        
+        if CVPixelBufferIsPlanar(pixelBuffer) {
+            baseAddress = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) // Y-Plane
+            bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
+            totalWidth = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0)
+            totalHeight = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
+        } else {
+            // Fallback for non-planar (shouldn't happen with default settings, but safe)
+            baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer)
+            bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+            totalWidth = CVPixelBufferGetWidth(pixelBuffer)
+            totalHeight = CVPixelBufferGetHeight(pixelBuffer)
+        }
+        
+        guard let safeBase = baseAddress else { return nil }
+        let buffer = safeBase.assumingMemoryBound(to: UInt8.self)
         
         var art = ""
-        let chars = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "] // Dark to Light map
+        let chars = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
         
-        // Sampling steps
         let stepX = totalWidth / width
         let stepY = totalHeight / height
         
         for y in 0..<height {
             for x in 0..<width {
-                // Simple nearest-neighbor sampling
                 let pixelX = x * stepX
                 let pixelY = y * stepY
-                let offset = pixelY * bytesPerRow + pixelX * 4 // Assuming BGRA (4 bytes)
+                let offset = pixelY * bytesPerRow + pixelX // 1 byte per pixel in Y plane
                 
-                // Calculate brightness (average of RGB)
-                let b = buffer[offset]
-                let g = buffer[offset + 1]
-                let r = buffer[offset + 2]
-                let brightness = Int(Double(r) + Double(g) + Double(b)) / 3
-                
-                // Map brightness to character index
-                let index = (brightness * (chars.count - 1)) / 255
+                let brightness = buffer[offset] // Direct luminance value
+                let index = (Int(brightness) * (chars.count - 1)) / 255
                 art.append(chars[index])
             }
             art.append("\n")
