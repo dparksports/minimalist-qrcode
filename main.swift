@@ -41,8 +41,9 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             guard let results = request.results as? [VNBarcodeObservation] else { return }
             for result in results {
                 if let payload = result.payloadStringValue, payload.hasPrefix("WIFI:") {
-                    // Play success sound
-                    NSSound(named: "Hero")?.play()
+                    // Play success sound (Beep + Bell for terminal)
+                    NSSound.beep()
+                    print("\u{0007}", terminator: "") 
                     self.parseAndLog(payload)
                 }
             }
@@ -136,11 +137,17 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             self.session.stopRunning()
             
             DispatchQueue.main.async {
+                // Clear screen completely before showing results
+                print("\u{001B}[2J\u{001B}[H")
+                
                 print("\n✅ FOUND NETWORK: \(ssid)")
                 print("✅ FOUND PASSWORD: \(password)")
                 
-                print("\n❓ Do you want to join this network? [y/N]: ", terminator: "")
-                if let response = readLine(), response.lowercased() == "y" || response.lowercased() == "yes" {
+                print("\n❓ Do you want to join this network? [Y/n]: ", terminator: "")
+                let response = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+                
+                // Default to YES (empty or starting with y)
+                if response.isEmpty || response.hasPrefix("y") {
                     self.joinNetwork(ssid: ssid, password: password)
                 } else {
                     print("👋 Exiting without joining.")
