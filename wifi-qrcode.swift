@@ -36,14 +36,25 @@ let request = VNDetectBarcodesRequest { request, error in
 // 4. Helper to parse the Wi-Fi string (Format: WIFI:S:SSID;T:WPA;P:PASSWORD;;)
 func extractPassword(from wifiString: String) {
     let components = wifiString.split(separator: ";")
+    var ssid: String?
+    var password: String?
+
     for component in components {
-        if component.trimmingCharacters(in: .whitespaces).hasPrefix("P:") {
-            let password = component.dropFirst(2)
-            print("Password found: \(password)")
-            return
+        let trimmed = component.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("S:") {
+            ssid = String(trimmed.dropFirst(2))
+        } else if trimmed.hasPrefix("P:") {
+            password = String(trimmed.dropFirst(2))
         }
     }
-    print("Wi-Fi QR found, but no password detected in payload.")
+    
+    if let ssid = ssid, let password = password {
+        print("Network: \(ssid)")
+        print("Password: \(password)")
+        return
+    }
+    
+    print("Wi-Fi QR found, but missing SSID or Password.")
 }
 
 // 5. Perform the request

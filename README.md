@@ -22,6 +22,9 @@ chmod +x wifi_scanner
 ./wifi_scanner
 ```
 
+> **Note**: Downloading via `curl` (as shown above) usually avoids macOS "Unidentified Developer" warnings. If you download via a browser, you may need to Right-Click > Open or go to System Settings > Privacy & Security to allow the app to run.
+
+
 ### Option 2: Build from Source
 
 Requirements: macOS with Swift installed (Xcode Command Line Tools).

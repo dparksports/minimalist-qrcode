@@ -48,16 +48,67 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     func parseAndLog(_ payload: String) {
         // Expected Format: WIFI:S:SSID;T:WPA;P:PASSWORD;;
+        var ssid: String?
+        var password: String?
+        
         let components = payload.split(separator: ";")
         for component in components {
-            if component.trimmingCharacters(in: .whitespaces).hasPrefix("P:") {
-                let password = component.dropFirst(2)
-                
-                // Print clearly and exit
-                print("\n✅ FOUND PASSWORD: \(password)")
-                exit(0)
+            let trimmed = component.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("S:") {
+                ssid = String(trimmed.dropFirst(2))
+            } else if trimmed.hasPrefix("P:") {
+                password = String(trimmed.dropFirst(2))
             }
         }
+        
+        if let ssid = ssid, let password = password {
+            // Stop scanning so we don't trigger multiple times
+            self.session.stopRunning()
+            
+            DispatchQueue.main.async {
+                print("\n✅ FOUND NETWORK: \(ssid)")
+                print("✅ FOUND PASSWORD: \(password)")
+                
+                print("\n❓ Do you want to join this network? [y/N]: ", terminator: "")
+                if let response = readLine(), response.lowercased() == "y" || response.lowercased() == "yes" {
+                    self.joinNetwork(ssid: ssid, password: password)
+                } else {
+                    print("👋 Exiting without joining.")
+                    exit(0)
+                }
+            }
+        }
+    }
+    
+    func joinNetwork(ssid: String, password: String) {
+        print("🔗 Attempting to join network '\(ssid)'...")
+        
+        // ... (rest of join logic)
+        let task = Process()
+        task.launchPath = "/usr/sbin/networksetup"
+        task.arguments = ["-setairportnetwork", "en0", ssid, password]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+        
+        task.launch()
+        task.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8), !output.isEmpty {
+            // Only print if there's an error or relevant info, otherwise keep it clean
+             if task.terminationStatus != 0 {
+                 print(output)
+             }
+        }
+        
+        if task.terminationStatus == 0 {
+            print("🎉 Successfully joined '\(ssid)'!")
+        } else {
+            print("⚠️ Failed to join. You might need to check credentials or run with sudo.")
+        }
+        exit(task.terminationStatus)
     }
 }
 
