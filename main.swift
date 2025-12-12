@@ -40,14 +40,16 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             guard let results = request.results as? [VNBarcodeObservation] else { return }
             for result in results {
                 if let payload = result.payloadStringValue, payload.hasPrefix("WIFI:") {
+                    // Play success sound
+                    NSSound(named: "Hero")?.play()
                     self.parseAndLog(payload)
                 }
             }
         }
+        // 1. Scan for QR Code (Prioritize this!)
         try? VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])
         
-        // --- ASCII Preview ---
-        // Downscale and render ASCII art for live preview
+        // 2. Render ASCII Preview (After scanning is done)
         let width = 64
         let height = 32
         if let ascii = self.asciiArt(from: pixelBuffer, width: width, height: height) {
