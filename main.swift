@@ -2,14 +2,14 @@ import AVFoundation
 import Vision
 import Cocoa
 
-print("1. Program launched...")
+// 1. Program launched... (Removed)
 
 class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     var frameCount = 0
     
     func start() {
-        print("4. Configuring Camera...")
+        print("Configuring camera...")
         guard let device = AVCaptureDevice.default(for: .video),
               let input = try? AVCaptureDeviceInput(device: device) else {
             print("❌ Error: No camera found or input failed.")
@@ -23,7 +23,7 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         session.addInput(input)
         session.addOutput(output)
         
-        print("5. Starting Session...")
+        print("Starting scanner...")
         // Move startRunning to background thread to prevent blocking the Main Loop
         DispatchQueue.global(qos: .userInitiated).async {
             self.session.startRunning()
@@ -155,7 +155,7 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 }
             }
         } else {
-            print("\(payload)")
+            // debug print removed
         }
     }
     
@@ -193,16 +193,16 @@ class Scanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 
 let scanner = Scanner()
 
-print("2. Checking Permissions...")
+print("Verifying permissions...")
 switch AVCaptureDevice.authorizationStatus(for: .video) {
     case .authorized:
-        print("3. Permission already granted.")
+        print("Access verified.")
         scanner.start()
     case .notDetermined:
-        print("3. Requesting permission (Look for a popup)...")
+        print("Requesting camera permission...")
         AVCaptureDevice.requestAccess(for: .video) { granted in
             if granted {
-                print("3. Permission granted by user.")
+                print("Permission granted.")
                 // Must jump back to main thread to start scanning
                 DispatchQueue.main.async { scanner.start() }
             } else {
